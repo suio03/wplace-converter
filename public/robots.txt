@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Sitemap: https://wplacepixel.cc/sitemap.xml
+Disallow: /cdn-cgi/
+Disallow: /_next/
+
