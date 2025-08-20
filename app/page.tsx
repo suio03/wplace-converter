@@ -1,6 +1,13 @@
 import WplaceConverter from '@/components/WplaceConverter'
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { Press_Start_2P } from 'next/font/google'
+
+const pixelFont = Press_Start_2P({
+  weight: '400',
+  subsets: ['latin'],
+  display: 'swap'
+})
 
 export const runtime = 'edge'
 
@@ -76,7 +83,7 @@ export default function Home() {
             {/* Hero Section */}
             <section id="calculator" className="relative z-10 px-4 py-16 max-w-4xl mx-auto">
                 <div className="text-center mb-16">
-                    <h1 className="text-4xl md:text-6xl font-bold mb-6 text-gray-800 leading-tight">
+                    <h1 className={`${pixelFont.className} text-xl md:text-3xl mb-6 text-gray-800 leading-relaxed`}>
                         Free Wplace Pixel Art Converter
                     </h1>
                     <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-4xl mx-auto">

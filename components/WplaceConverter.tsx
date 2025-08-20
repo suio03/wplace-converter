@@ -18,6 +18,10 @@ export default function WplaceConverter() {
   const [gridSize, setGridSize] = useState(64);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [inputType, setInputType] = useState<'image' | 'text'>('image');
+  const [textInput, setTextInput] = useState('');
+  const [fontSize, setFontSize] = useState(32);
+  const [selectedTextColor, setSelectedTextColor] = useState(WPLACE_PALETTE[0]); // Default to first color
   const [pixelSize, setPixelSize] = useState(20);
   const [scale, setScale] = useState(1.0);
   const [zoomLevel, setZoomLevel] = useState(3);
@@ -115,6 +119,55 @@ export default function WplaceConverter() {
     };
   }, [freeColorsOnly, gridSize]);
 
+  const processText = useCallback((text: string) => {
+    if (!text.trim()) {
+      setProcessedImage(null);
+      setUploadedImage(null);
+      return;
+    }
+    
+    // Create a temporary canvas to render text
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    if (!tempCtx) return;
+
+    // Set up font and measure text
+    tempCtx.font = `${fontSize}px monospace`;
+    const textMetrics = tempCtx.measureText(text);
+    const textWidth = Math.ceil(textMetrics.width);
+    const textHeight = fontSize;
+
+    // Set canvas size with padding
+    const padding = 20;
+    tempCanvas.width = textWidth + padding * 2;
+    tempCanvas.height = textHeight + padding * 2;
+
+    // Fill with white background for better contrast
+    tempCtx.fillStyle = '#FFFFFF';
+    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+    
+    // Draw text in selected color
+    tempCtx.font = `${fontSize}px monospace`;
+    tempCtx.fillStyle = selectedTextColor.hex;
+    tempCtx.textBaseline = 'middle';
+    tempCtx.textAlign = 'left';
+    tempCtx.fillText(text, padding, tempCanvas.height / 2);
+
+    // Convert canvas to image and process it
+    const img = new Image();
+    img.onload = () => {
+      setUploadedImage(img);
+      const processed = processImage(img);
+      if (processed) {
+        setProcessedImage(processed);
+      }
+    };
+    img.onerror = (error) => {
+      console.error('Error loading text image:', error);
+    };
+    img.src = tempCanvas.toDataURL();
+  }, [fontSize, selectedTextColor, processImage]);
+
   const handleFileUpload = useCallback((file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -179,6 +232,14 @@ export default function WplaceConverter() {
       }
     }
   }, [uploadedImage, processImage, gridSize, freeColorsOnly]);
+
+  // Manual text processing
+  const handleRenderText = useCallback(() => {
+    if (textInput.trim()) {
+      console.log('Rendering text:', textInput);
+      processText(textInput);
+    }
+  }, [textInput, processText]);
 
   const copyToClipboard = useCallback(() => {
     if (!processedImage) return;
@@ -341,10 +402,16 @@ export default function WplaceConverter() {
           
           <div className="flex gap-3">
             <button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                if (inputType === 'text') {
+                  setTextInput('');
+                }
+                setProcessedImage(null);
+                setUploadedImage(null);
+              }}
               className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 border border-gray-600"
             >
-              📄 Upload New Image
+              🔄 {inputType === 'text' ? 'Clear Text' : 'Start New'}
             </button>
             <button
               onClick={downloadImage}
@@ -428,27 +495,123 @@ export default function WplaceConverter() {
   return (
     <div className="bg-gray-900 text-white rounded-lg overflow-hidden w-full max-w-[1400px] mx-auto">
       <div className="flex flex-col lg:flex-row min-h-[800px]">
-        {/* Left Panel - Canvas */}
+        {/* Left Panel - Input or Canvas */}
         <div className="flex-1 min-w-[700px] p-8 bg-gray-800">
-          {!processedImage ? (
-            <div className="flex-1 flex items-center justify-center p-12 bg-gray-800 rounded-tl-lg">
-              <div
-                className={`border-2 border-dashed rounded-lg flex items-center justify-center w-[600px] h-[600px] transition-colors ${
-                  dragActive ? 'border-blue-400 bg-blue-400/10' : 'border-gray-600'
+          {/* Input Type Selector - Always Visible */}
+          <div className="flex justify-center mb-6">
+            <div className="bg-gray-700 rounded-lg p-1 flex">
+              <button
+                onClick={() => {
+                  setInputType('image');
+                  if (inputType !== 'image') {
+                    setProcessedImage(null);
+                    setUploadedImage(null);
+                    setTextInput('');
+                  }
+                }}
+                className={`px-4 py-2 rounded transition-colors ${
+                  inputType === 'image' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'text-gray-400 hover:text-white'
                 }`}
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
               >
-                <div className="text-center">
-                  <Upload size={48} className="mx-auto mb-4 text-gray-400" />
-                  <p className="text-gray-400 mb-2">Drop an image here or</p>
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                  >
-                    Upload New Image
-                  </button>
+                🖼️ Image
+              </button>
+              <button
+                onClick={() => {
+                  setInputType('text');
+                  if (inputType !== 'text') {
+                    setProcessedImage(null);
+                    setUploadedImage(null);
+                  }
+                }}
+                className={`px-4 py-2 rounded transition-colors ${
+                  inputType === 'text' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                📝 Text
+              </button>
+            </div>
+          </div>
+
+          {inputType === 'text' ? (
+            /* Text Input Section - Always Visible */
+            <div className="flex-1 flex flex-col">
+              {!processedImage ? (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="w-[600px] bg-gray-700 rounded-lg p-6">
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-white font-medium mb-3">Text to Convert</label>
+                        <textarea
+                          value={textInput}
+                          onChange={(e) => setTextInput(e.target.value)}
+                          placeholder="Enter your text here..."
+                          className="w-full h-32 bg-gray-600 border border-gray-500 rounded px-4 py-3 text-white placeholder-gray-400 resize-none text-lg focus:border-blue-500 focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-white font-medium mb-2">Font Size</label>
+                        <input
+                          type="range"
+                          min="16"
+                          max="96"
+                          value={fontSize}
+                          onChange={(e) => setFontSize(Number(e.target.value))}
+                          className="w-full"
+                        />
+                        <div className="text-center text-sm text-gray-400 mt-1">{fontSize}px</div>
+                      </div>
+
+                      <div className="text-center">
+                        <button
+                          onClick={handleRenderText}
+                          disabled={!textInput.trim()}
+                          className={`px-6 py-3 rounded font-medium transition-colors ${
+                            textInput.trim()
+                              ? 'bg-blue-600 text-white hover:bg-blue-700'
+                              : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                          }`}
+                        >
+                          🎨 Convert text to pixel
+                        </button>
+                      </div>
+
+                      <div className="text-center text-gray-400 text-sm">
+                        Click the button above to convert your text to pixel art
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                renderPixelArt()
+              )}
+            </div>
+          ) : !processedImage ? (
+            /* Image Upload Section */
+            <div className="flex-1 flex items-center justify-center">
+              <div className="w-[600px] h-[400px] border-2 border-dashed border-gray-600 rounded-lg p-8">
+                <div 
+                  className={`border-2 border-dashed rounded-lg flex items-center justify-center h-full transition-colors ${
+                    dragActive ? 'border-blue-400 bg-blue-400/10' : 'border-gray-600'
+                  }`}
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                >
+                  <div className="text-center">
+                    <Upload size={48} className="mx-auto mb-4 text-gray-400" />
+                    <p className="text-gray-400 mb-2">Drop an image here or</p>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                      Upload Image
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -466,141 +629,176 @@ export default function WplaceConverter() {
 
         {/* Right Panel - Controls */}
         <div className="w-full lg:w-[400px] min-w-[400px] bg-gray-900 p-6 space-y-6 rounded-tr-lg rounded-br-lg">
-          
-          {/* Grid Size Selector */}
-          <div>
-            <label className="block text-white font-medium mb-3">
-              Grid Size
-            </label>
-            <select
-              value={gridSize}
-              onChange={(e) => setGridSize(Number(e.target.value))}
-              className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-3 text-white"
-            >
-              <option value={32}>32×32 1,024 pixels</option>
-              <option value={48}>48×48 2,304 pixels</option>
-              <option value={64}>64×64 4,096 pixels</option>
-              <option value={96}>96×96 9,216 pixels</option>
-              <option value={128}>128×128 16,384 pixels</option>
-              <option value={256}>256×256 65,536 pixels</option>
-              <option value={512}>512×512 262,144 pixels</option>
-            </select>
-          </div>
-
-          {/* Display Mode */}
-          <div>
-            <label className="block text-white font-medium mb-3">
-              Display Mode
-            </label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowGrid(false)}
-                className={`flex-1 px-4 py-2 rounded font-medium transition-colors ${
-                  !showGrid ? 'bg-gray-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                }`}
-              >
-                👁️ Normal
-              </button>
-              <button
-                onClick={() => setShowGrid(true)}
-                className={`flex-1 px-4 py-2 rounded font-medium transition-colors ${
-                  showGrid ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                }`}
-              >
-                🗂️ Grid
-              </button>
-            </div>
-          </div>
-
-          {/* Free Colors Only */}
-          <div>
-            <label className="block text-white font-medium mb-3">
-              Free Colors Only
-            </label>
-            <div className="flex items-center justify-between">
-                          <div className="text-sm text-gray-400">
-              Use only free colors with our wplace pixel converter, automatically selecting the closest free color match
-            </div>
-              <label className="flex items-center ml-4">
-                <input
-                  type="checkbox"
-                  checked={freeColorsOnly}
-                  onChange={(e) => setFreeColorsOnly(e.target.checked)}
-                  className="sr-only"
-                />
-                <div className={`relative w-12 h-6 rounded-full p-1 transition-colors ${freeColorsOnly ? 'bg-green-600' : 'bg-gray-600'}`}>
-                  <div className={`w-4 h-4 bg-white rounded-full transition-transform ${freeColorsOnly ? 'translate-x-6' : 'translate-x-0'}`} />
-                </div>
-              </label>
-            </div>
-          </div>
-
-          {/* Colors Used Section */}
-          {processedImage && (
+          <div className="space-y-6">
+            {/* Grid Size Selector */}
             <div>
-              <h3 className="text-white font-medium mb-3">Colors Used in This Image</h3>
-              <div className="flex items-center gap-6 mb-4 text-sm">
-                <span className="text-gray-300">
-                  Total: <span className="font-bold text-white">{processedImage.usedColors.length}</span>
-                </span>
-                <span className="text-gray-300">
-                  Free: <span className="font-bold text-green-400">{freeColorsCount}</span>
-                </span>
-                <span className="text-gray-300">
-                  Premium: <span className="font-bold text-orange-400">{premiumColorsCount}</span>
-                </span>
-              </div>
-              
-              <div className="text-xs text-gray-400 mb-3">
-                These are all the colors from the Wplace palette used in your pixel art generated by our wplace pixel converter. Premium colors (with lock icons) need to be purchased on the official website.
-              </div>
-              
-              <div className="grid grid-cols-10 gap-2 mb-6">
-                {processedImage.usedColors.map(({ color, count }, index) => (
-                  <div
-                    key={index}
-                    className="relative w-8 h-8 rounded border-2 border-gray-600 group cursor-pointer hover:border-white"
-                    style={{ backgroundColor: color.hex }}
-                    title={`${color.name} (${count} pixels) ${color.isPremium ? 'Premium' : 'Free'}`}
-                  >
-                    {color.isPremium && (
-                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center">
-                        <span className="text-xs">🔒</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+              <label className="block text-white font-medium mb-3">
+                Grid Size
+              </label>
+              <select
+                value={gridSize}
+                onChange={(e) => setGridSize(Number(e.target.value))}
+                className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-3 text-white"
+              >
+                <option value={32}>32×32 1,024 pixels</option>
+                <option value={48}>48×48 2,304 pixels</option>
+                <option value={64}>64×64 4,096 pixels</option>
+                <option value={96}>96×96 9,216 pixels</option>
+                <option value={128}>128×128 16,384 pixels</option>
+                <option value={256}>256×256 65,536 pixels</option>
+                <option value={512}>512×512 262,144 pixels</option>
+              </select>
             </div>
-          )}
 
-          {/* Wplace Official Color Palette */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-white font-medium">Official Wplace 64-color palette</h3>
-              <span className="text-xs text-gray-400">64 colors</span>
-            </div>
-            
-            <div className="border border-gray-700 rounded-lg p-4 mb-4">
-              <div className="grid grid-cols-8 gap-1 mb-4">
-                {WPLACE_PALETTE.map((color, index) => (
-                  <div
-                    key={index}
-                    className="relative w-8 h-8 rounded border border-gray-600 cursor-pointer hover:border-white group"
-                    style={{ backgroundColor: color.hex }}
-                    title={`${color.name} ${color.isPremium ? '(Premium)' : '(Free)'}`}
+            {/* Display Mode */}
+            {processedImage && (
+              <div>
+                <label className="block text-white font-medium mb-3">
+                  Display Mode
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowGrid(false)}
+                    className={`flex-1 px-4 py-2 rounded font-medium transition-colors ${
+                      !showGrid ? 'bg-gray-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                    }`}
                   >
-                    {color.isPremium && (
-                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center">
-                        <span className="text-xs">🔒</span>
-                      </div>
-                    )}
+                    👁️ Normal
+                  </button>
+                  <button
+                    onClick={() => setShowGrid(true)}
+                    className={`flex-1 px-4 py-2 rounded font-medium transition-colors ${
+                      showGrid ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                    }`}
+                  >
+                    🗂️ Grid
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Free Colors Only */}
+            <div>
+              <label className="block text-white font-medium mb-3">
+                Free Colors Only
+              </label>
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-400">
+                  Use only free colors with our wplace pixel converter, automatically selecting the closest free color match
+                </div>
+                <label className="flex items-center ml-4">
+                  <input
+                    type="checkbox"
+                    checked={freeColorsOnly}
+                    onChange={(e) => setFreeColorsOnly(e.target.checked)}
+                    className="sr-only"
+                  />
+                  <div className={`relative w-12 h-6 rounded-full p-1 transition-colors ${freeColorsOnly ? 'bg-green-600' : 'bg-gray-600'}`}>
+                    <div className={`w-4 h-4 bg-white rounded-full transition-transform ${freeColorsOnly ? 'translate-x-6' : 'translate-x-0'}`} />
                   </div>
-                ))}
+                </label>
+              </div>
+            </div>
+
+            {/* Colors Used Section */}
+            {processedImage && (
+              <div>
+                <h3 className="text-white font-medium mb-3">Colors Used in This Image</h3>
+                <div className="flex items-center gap-6 mb-4 text-sm">
+                  <span className="text-gray-300">
+                    Total: <span className="font-bold text-white">{processedImage.usedColors.length}</span>
+                  </span>
+                  <span className="text-gray-300">
+                    Free: <span className="font-bold text-green-400">{processedImage.usedColors.filter(({ color }) => !color.isPremium).length}</span>
+                  </span>
+                  <span className="text-gray-300">
+                    Premium: <span className="font-bold text-orange-400">{processedImage.usedColors.filter(({ color }) => color.isPremium).length}</span>
+                  </span>
+                </div>
+                
+                <div className="text-xs text-gray-400 mb-3">
+                  These are all the colors from the Wplace palette used in your pixel art generated by our wplace pixel converter. Premium colors (with lock icons) need to be purchased on the official website.
+                </div>
+                
+                <div className="grid grid-cols-10 gap-2 mb-6">
+                  {processedImage.usedColors.map(({ color, count }, index) => (
+                    <div
+                      key={index}
+                      className="relative w-8 h-8 rounded border-2 border-gray-600 group cursor-pointer hover:border-white"
+                      style={{ backgroundColor: color.hex }}
+                    >
+                      {color.isPremium && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center">
+                          <span className="text-xs">🔒</span>
+                        </div>
+                      )}
+                      {/* Custom Tooltip */}
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                        {color.name} ({count} pixels) {color.isPremium ? 'Premium' : 'Free'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Wplace Official Color Palette */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-white font-medium">Official Wplace 64-color palette</h3>
+                <span className="text-xs text-gray-400">64 colors</span>
               </div>
               
-              <div className="text-xs text-gray-400 mb-0">
-                Official Wplace 64-color palette - complete match with the game. Our wplace pixel converter ensures perfect color accuracy.
+              <div className="border border-gray-700 rounded-lg p-4 mb-4">
+                <div className="grid grid-cols-8 gap-1 mb-4">
+                  {WPLACE_PALETTE.map((color, index) => (
+                    <div
+                      key={index}
+                      onClick={() => inputType === 'text' && setSelectedTextColor(color)}
+                      className={`relative w-8 h-8 rounded border-2 cursor-pointer hover:border-white group transition-colors ${
+                        inputType === 'text' && selectedTextColor.hex === color.hex 
+                          ? 'border-blue-400' 
+                          : 'border-gray-600'
+                      }`}
+                      style={{ backgroundColor: color.hex }}
+                    >
+                      {color.isPremium && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center">
+                          <span className="text-xs">🔒</span>
+                        </div>
+                      )}
+                      {inputType === 'text' && selectedTextColor.hex === color.hex && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-3 h-3 bg-white rounded-full border border-gray-800"></div>
+                        </div>
+                      )}
+                      {/* Custom Tooltip */}
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                        {color.name} {color.isPremium ? '(Premium)' : ''}
+                        {inputType === 'text' && selectedTextColor.hex === color.hex && ' (Selected)'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="text-xs text-gray-400 mb-0">
+                  Official Wplace 64-color palette - complete match with the game. Our wplace pixel converter ensures perfect color accuracy.
+                  {inputType === 'text' && (
+                    <div className="mt-2 pt-2 border-t border-gray-700">
+                      <span className="text-white">Selected text color: </span>
+                      <span className="inline-flex items-center gap-2">
+                        <div 
+                          className="w-4 h-4 rounded border border-gray-500" 
+                          style={{ backgroundColor: selectedTextColor.hex }}
+                        ></div>
+                        <span className="font-medium text-white">{selectedTextColor.name}</span>
+                        <span className="text-gray-400">
+                          {selectedTextColor.isPremium ? '(Premium)' : '(Free)'}
+                        </span>
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

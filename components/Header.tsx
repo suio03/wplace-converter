@@ -1,5 +1,10 @@
-'use client'
+import { Press_Start_2P } from 'next/font/google'
 
+const pixelFont = Press_Start_2P({
+  weight: '400',
+  subsets: ['latin'],
+  display: 'swap'
+})
 import Logo from '@/public/icon.svg'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -11,7 +16,7 @@ export default function Header() {
                     <div className="flex items-center justify-between">
                         <Link href="/" className="flex items-center gap-3">
                             <Image src={Logo} alt="Wplace Pixel Art Converter" width={32} height={32} />
-                            <h1 className="text-xl font-bold text-gray-800">Wplace Pixel Art Converter</h1>
+                            <p className={`text-sm font-bold text-gray-800 ${pixelFont.className}`}>Wplace Pixel Art Converter</p>
                         </Link>
                     </div>
                 </div>

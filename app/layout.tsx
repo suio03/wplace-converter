@@ -1,9 +1,17 @@
 
 import type { ReactNode } from 'react'
+import { Press_Start_2P } from 'next/font/google'
 import '@/app/globals.css'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Analytics from '@/components/analytics'
+
+const pixelFont = Press_Start_2P({
+  weight: '400',
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-press-start'
+})
 
 
 
@@ -15,7 +23,7 @@ export default async function DashboardLayout({
     params: Promise<{ locale: string }>
 }) {
     return (
-        <html lang="en">
+        <html lang="en" className={pixelFont.variable}>
             <Analytics />
             <body className="font-sans antialiased text-gray-800 tracking-tight">
                 {/* Beautiful gradient background */}

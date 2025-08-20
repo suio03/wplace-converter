@@ -1,8 +1,14 @@
-'use client';
 
 import Logo from '@/public/icon.svg'
 import Image from 'next/image'
 import Link from 'next/link';
+import { Press_Start_2P } from 'next/font/google'
+
+const pixelFont = Press_Start_2P({
+  weight: '400',
+  subsets: ['latin'],
+  display: 'swap'
+})
 export default function Footer() {
 
   return (
@@ -14,7 +20,7 @@ export default function Footer() {
             <div className="md:col-span-2">
               <div className="flex items-center gap-3 mb-4">
                 <Image src={Logo} alt="Wplace Pixel Art Converter" width={32} height={32} />
-                <h3 className="text-xl font-bold text-gray-800">Wplace Pixel Art Converter</h3>
+                <h3 className={`text-sm font-bold text-gray-800 ${pixelFont.className}`}>Wplace Pixel Art Converter</h3>
               </div>
               <p className="text-gray-600 mb-4">
                 Transform any image into pixel-perfect art ready for Wplace.live's collaborative canvas. Free, private, and optimized for Wplace's official 64-color palette.
